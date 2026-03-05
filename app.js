@@ -51,7 +51,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (!splitInstance) {
                 splitInstance = Split(['#chartPrice', '#chartRSI', '#chartStoch', '#chartMACD'], {
                     direction: 'vertical',
-                    sizes: [55, 15, 15, 15],
+                    sizes: [55, 15, 10, 20],
                     minSize: 50,
                     gutterSize: 6,
                     cursor: 'row-resize',
