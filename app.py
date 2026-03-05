@@ -39,5 +39,19 @@ def get_stock_data(symbol):
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/stock_info/<symbol>')
+def get_stock_info(symbol):
+    try:
+        ticker = yf.Ticker(symbol)
+        info = ticker.info
+        
+        if not info or ('regularMarketPrice' not in info and 'previousClose' not in info and 'longName' not in info):
+            return jsonify({'error': 'No substantial company information found'}), 404
+            
+        return jsonify(info)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 if __name__ == '__main__':
     app.run(debug=True)

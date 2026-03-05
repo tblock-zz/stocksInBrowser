@@ -6,6 +6,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const chartRSI = document.getElementById('chartRSI');
     const chartStoch = document.getElementById('chartStoch');
     const chartMACD = document.getElementById('chartMACD');
+    
+    // Company Info elements
+    const companyInfoWrapper = document.getElementById('companyInfoWrapper');
+    const companyName = document.getElementById('companyName');
+    const companyDetails = document.getElementById('companyDetails');
+    const companySummary = document.getElementById('companySummary');
 
     let splitInstance = null;
     let mouseDownPoint = null;
@@ -65,6 +71,9 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             renderChart(data, symbol);
+            
+            // Load company info
+            loadCompanyInfo(symbol);
 
         } catch (error) {
             errorMsg.textContent = `Error: ${error.message}`;
@@ -72,7 +81,133 @@ document.addEventListener('DOMContentLoaded', function() {
             chartRSI.innerHTML = '';
             chartStoch.innerHTML = '';
             chartMACD.innerHTML = '';
+            companyInfoWrapper.style.display = 'none';
         }
+    }
+    
+    async function loadCompanyInfo(symbol) {
+        try {
+            const response = await fetch(`/api/stock_info/${symbol}?t=${Date.now()}`);
+            
+            if (!response.ok) {
+                companyInfoWrapper.style.display = 'none';
+                return;
+            }
+            
+            const info = await response.json();
+            
+            if (info.error) {
+                companyInfoWrapper.style.display = 'none';
+                return;
+            }
+            
+            // Populate company info
+            companyName.textContent = `--- ${info.longName || symbol} (${symbol}) ---`;
+            
+            companyDetails.innerHTML = '';
+            
+            const infoMap = {
+                "Sector": info.sector,
+                "Industry": info.industry,
+                "Website": info.website ? `<a href="${info.website}" target="_blank">${info.website}</a>` : null,
+                "Currency": info.currency,
+                "Market Cap": formatNumber(info.marketCap),
+                "Shares Outstanding": formatNumber(info.sharesOutstanding),
+                "P/E Ratio": formatValue(info.trailingPE),
+                "Forward P/E": formatValue(info.forwardPE),
+                "EPS (TTM)": formatValue(info.trailingEps),
+                "Forward EPS": formatValue(info.forwardEps),
+                "Beta": formatValue(info.beta),
+                "Dividend Rate": formatValue(info.dividendRate),
+                "Dividend Yield": formatValue(info.dividendYield),
+                "Dividend payout ratio": formatValue(info.payoutRatio),
+                "Ex-Dividend Date": formatDate(info.exDividendDate),
+                "52 Week High": formatValue(info.fiftyTwoWeekHigh),
+                "52 Week Low": formatValue(info.fiftyTwoWeekLow),
+                "Avg. Volume": formatNumber(info.averageVolume),
+                "Current Price": formatValue(info.currentPrice),
+                "Regular Market Price": formatValue(info.regularMarketPrice),
+                "Open": formatValue(info.open),
+                "Previous Close": formatValue(info.previousClose),
+                "Day High": formatValue(info.dayHigh),
+                "Day Low": formatValue(info.dayLow),
+                "Earnings Date": formatEarningsDate(info.earningsTimestampStart),
+                "Recommendation": info.recommendationKey ? info.recommendationKey.charAt(0).toUpperCase() + info.recommendationKey.slice(1) : null
+            };
+            
+            for (const [label, value] of Object.entries(infoMap)) {
+                if (value !== null && value !== undefined && value !== 'N/A') {
+                    const detailDiv = document.createElement('div');
+                    detailDiv.className = 'info-item';
+                    
+                    if (label === 'Website') {
+                        detailDiv.innerHTML = `<strong>${label}:</strong> ${value}`;
+                    } else {
+                        detailDiv.innerHTML = `<strong>${label}:</strong> <span>${value}</span>`;
+                    }
+                    
+                    companyDetails.appendChild(detailDiv);
+                }
+            }
+            
+            if (info.longBusinessSummary) {
+                companySummary.textContent = info.longBusinessSummary;
+                document.querySelector('.company-summary').style.display = 'block';
+            } else {
+                document.querySelector('.company-summary').style.display = 'none';
+            }
+            
+            companyInfoWrapper.style.display = 'block';
+            
+        } catch (error) {
+            console.error("Failed to load company info:", error);
+            companyInfoWrapper.style.display = 'none';
+        }
+    }
+    
+    function formatValue(val) {
+        if (val === null || val === undefined) return 'N/A';
+        if (typeof val === 'number') return val.toFixed(2);
+        return val;
+    }
+    
+    function formatNumber(num) {
+        if (num === null || num === undefined) return 'N/A';
+        if (num >= 1000000000) {
+            return (num / 1000000000).toFixed(2) + 'B';
+        }
+        if (num >= 1000000) {
+            return (num / 1000000).toFixed(2) + 'M';
+        }
+        if (num >= 1000) {
+            return (num / 1000).toFixed(2) + 'K';
+        }
+        return num.toLocaleString();
+    }
+    
+    function formatDate(timestamp) {
+        if (!timestamp) return 'N/A';
+        const date = new Date(timestamp * 1000);
+        return date.toISOString().split('T')[0];
+    }
+
+    function formatEarningsDate(earningsStart) {
+        if (earningsStart === null || earningsStart === undefined) return 'N/A';
+        
+        let tsValue = null;
+        if (Array.isArray(earningsStart) && earningsStart.length > 0) {
+            const numericValues = earningsStart.filter(v => typeof v === 'number');
+            if (numericValues.length > 0) {
+                tsValue = Math.min(...numericValues);
+            }
+        } else if (typeof earningsStart === 'number') {
+            tsValue = earningsStart;
+        }
+        
+        if (tsValue !== null) {
+            return formatDate(tsValue);
+        }
+        return 'N/A';
     }
 
     function calculateSMA(values, period) {
