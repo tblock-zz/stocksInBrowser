@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stock Candlestick Chart</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/split.js/1.6.5/split.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>Stock Candlestick Chart</h1>
+        
+        <div class="input-section">
+            <input type="text" id="tickerInput" placeholder="Enter ticker symbol (e.g., SPY, GOOG)" maxlength="10">
+            <button id="loadBtn">Load Chart</button>
+        </div>
+        
+        <div id="errorMsg" class="error-message"></div>
+        
+        <div class="chart-wrapper" id="mainWrapper">
+            <div id="chartPrice" class="split-window"></div>
+            <div id="chartRSI" class="split-window"></div>
+            <div id="chartStoch" class="split-window"></div>
+            <div id="chartMACD" class="split-window"></div>
+        </div>
+    </div>
+
+    <!-- Added timestamp to force browser to load latest JS -->
+    <script src="app.js?v=8"></script>
+</body>
+</html>

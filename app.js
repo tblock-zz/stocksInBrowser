@@ -1,0 +1,726 @@
+document.addEventListener('DOMContentLoaded', function() {
+    const tickerInput = document.getElementById('tickerInput');
+    const loadBtn = document.getElementById('loadBtn');
+    const errorMsg = document.getElementById('errorMsg');
+    const chartPrice = document.getElementById('chartPrice');
+    const chartRSI = document.getElementById('chartRSI');
+    const chartStoch = document.getElementById('chartStoch');
+    const chartMACD = document.getElementById('chartMACD');
+
+    let splitInstance = null;
+    let mouseDownPoint = null;
+
+    // Set default symbol and auto-load
+    tickerInput.value = 'SPY';
+    loadStockData('SPY');
+
+    // Event listeners
+    loadBtn.addEventListener('click', () => {
+        const symbol = tickerInput.value.trim().toUpperCase();
+        if (symbol) {
+            loadStockData(symbol);
+        }
+    });
+
+    tickerInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            const symbol = tickerInput.value.trim().toUpperCase();
+            if (symbol) {
+                loadStockData(symbol);
+            }
+        }
+    });
+
+    async function loadStockData(symbol) {
+        errorMsg.textContent = '';
+        
+        try {
+            // Append timestamp to prevent browser caching
+            const response = await fetch(`/api/stock/${symbol}?t=${Date.now()}`);
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to fetch stock data');
+            }
+
+            if (data.length === 0) {
+                throw new Error('No data found for this symbol');
+            }
+
+            // Initialize Split.js on first load
+            if (!splitInstance) {
+                splitInstance = Split(['#chartPrice', '#chartRSI', '#chartStoch', '#chartMACD'], {
+                    direction: 'vertical',
+                    sizes: [55, 15, 15, 15],
+                    minSize: 50,
+                    gutterSize: 6,
+                    cursor: 'row-resize',
+                    onDrag: () => {
+                        Plotly.Plots.resize(chartPrice);
+                        Plotly.Plots.resize(chartRSI);
+                        Plotly.Plots.resize(chartStoch);
+                        Plotly.Plots.resize(chartMACD);
+                    }
+                });
+            }
+
+            renderChart(data, symbol);
+
+        } catch (error) {
+            errorMsg.textContent = `Error: ${error.message}`;
+            chartPrice.innerHTML = '';
+            chartRSI.innerHTML = '';
+            chartStoch.innerHTML = '';
+            chartMACD.innerHTML = '';
+        }
+    }
+
+    function calculateSMA(values, period) {
+        const sma = [];
+        for (let i = 0; i < values.length; i++) {
+            if (i < period - 1) {
+                sma.push(null); // Not enough data yet
+            } else {
+                let sum = 0;
+                for (let j = 0; j < period; j++) {
+                    sum += values[i - j];
+                }
+                sma.push(sum / period);
+            }
+        }
+        return sma;
+    }
+
+    function calculateStandardDeviation(values, period) {
+        const stdDev = [];
+        for (let i = 0; i < values.length; i++) {
+            if (i < period - 1) {
+                stdDev.push(null); // Not enough data yet
+            } else {
+                let sum = 0;
+                for (let j = 0; j < period; j++) {
+                    sum += values[i - j];
+                }
+                const mean = sum / period;
+                let sqDiffSum = 0;
+                for (let j = 0; j < period; j++) {
+                    sqDiffSum += Math.pow(values[i - j] - mean, 2);
+                }
+                stdDev.push(Math.sqrt(sqDiffSum / period));
+            }
+        }
+        return stdDev;
+    }
+
+    function calculateEMA(values, period) {
+        const ema = [];
+        const multiplier = 2 / (period + 1);
+        
+        // Find first non-null index
+        let firstIdx = 0;
+        while(firstIdx < values.length && values[firstIdx] === null) {
+            ema.push(null);
+            firstIdx++;
+        }
+        
+        if (firstIdx >= values.length) return ema;
+
+        // Start with SMA for the first valid value
+        let sum = 0;
+        let count = 0;
+        for (let i = firstIdx; i < Math.min(firstIdx + period, values.length); i++) {
+            sum += values[i];
+            count++;
+            if (count < period) {
+                ema.push(null);
+            } else {
+                ema.push(sum / period);
+            }
+        }
+        
+        // Calculate EMA for the rest
+        for (let i = firstIdx + period; i < values.length; i++) {
+            const currentVal = values[i];
+            const prevEma = ema[i - 1];
+            ema.push((currentVal - prevEma) * multiplier + prevEma);
+        }
+        
+        return ema;
+    }
+
+    function calculateMACD(closes) {
+        const ema12 = calculateEMA(closes, 12);
+        const ema26 = calculateEMA(closes, 26);
+        
+        const macdLine = [];
+        for (let i = 0; i < closes.length; i++) {
+            if (ema12[i] !== null && ema26[i] !== null) {
+                macdLine.push(ema12[i] - ema26[i]);
+            } else {
+                macdLine.push(null);
+            }
+        }
+        
+        const signalLine = calculateEMA(macdLine, 9);
+        
+        const histogram = [];
+        for (let i = 0; i < closes.length; i++) {
+            if (macdLine[i] !== null && signalLine[i] !== null) {
+                histogram.push(macdLine[i] - signalLine[i]);
+            } else {
+                histogram.push(null);
+            }
+        }
+        
+        return { macdLine, signalLine, histogram };
+    }
+
+    function calculateRSI(closes, period = 14) {
+        const rsi = [];
+        let gains = 0;
+        let losses = 0;
+
+        for (let i = 0; i < closes.length; i++) {
+            if (i < period) {
+                rsi.push(null);
+                if (i > 0) {
+                    const diff = closes[i] - closes[i - 1];
+                    if (diff > 0) gains += diff;
+                    else losses -= diff;
+                }
+                if (i === period - 1) {
+                    gains /= period;
+                    losses /= period;
+                }
+            } else {
+                const diff = closes[i] - closes[i - 1];
+                let currentGain = 0;
+                let currentLoss = 0;
+                if (diff > 0) currentGain = diff;
+                else currentLoss = -diff;
+
+                gains = (gains * (period - 1) + currentGain) / period;
+                losses = (losses * (period - 1) + currentLoss) / period;
+
+                if (losses === 0) {
+                    rsi.push(100);
+                } else {
+                    const rs = gains / losses;
+                    rsi.push(100 - (100 / (1 + rs)));
+                }
+            }
+        }
+        return rsi;
+    }
+
+    function calculateStochastic(highs, lows, closes, period = 14, smoothK = 3, smoothD = 3) {
+        const fastK = [];
+        for (let i = 0; i < closes.length; i++) {
+            if (i < period - 1) {
+                fastK.push(null);
+            } else {
+                let highestHigh = highs[i];
+                let lowestLow = lows[i];
+                for (let j = 0; j < period; j++) {
+                    if (highs[i - j] > highestHigh) highestHigh = highs[i - j];
+                    if (lows[i - j] < lowestLow) lowestLow = lows[i - j];
+                }
+                if (highestHigh === lowestLow) {
+                    fastK.push(50);
+                } else {
+                    fastK.push(((closes[i] - lowestLow) / (highestHigh - lowestLow)) * 100);
+                }
+            }
+        }
+
+        const slowK = calculateSMA(fastK, smoothK);
+        const slowD = calculateSMA(slowK, smoothD);
+
+        return { k: slowK, d: slowD };
+    }
+
+    function renderChart(data, symbol) {
+        console.log('Rendering chart with', data.length, 'data points');
+        // Format dates to YY-MM-DD to save space
+        const dates = data.map(d => d.date.substring(2));
+        const closes = data.map(d => d.close);
+        const highs = data.map(d => d.high);
+        const lows = data.map(d => d.low);
+
+        // Show last ~2 years (or all available if less)
+        // A year has roughly 252 trading days. 2 years = 504 trading days.
+        const targetVisiblePoints = 504;
+        const startIdx = data.length >= targetVisiblePoints ? data.length - targetVisiblePoints : 0;
+        
+        // Find Y-axis min and max for the visible 2 years to set the initial Y-range
+        const visibleClosesForYAxis = closes.slice(startIdx);
+        const yMin = Math.min(...visibleClosesForYAxis) * 0.95; // 5% padding
+        const yMax = Math.max(...visibleClosesForYAxis) * 1.05; // 5% padding
+
+        // We no longer slice the data so the user can pan back in time!
+        const visibleData = data;
+        const visibleDates = dates;
+        const visibleCloses = closes;
+
+        // Calculate SMAs on FULL data
+        const sma10 = calculateSMA(closes, 10);
+        const sma50 = calculateSMA(closes, 50);
+        const sma20 = calculateSMA(closes, 20);
+        const sma200 = calculateSMA(closes, 200);
+
+        // We use full arrays for traces
+        const sma10Visible = sma10;
+        const sma50Visible = sma50;
+        const sma20Visible = sma20;
+        const sma200Visible = sma200;
+
+        // Bollinger Bands (20 periods) on full data
+        const bbPeriod = 20;
+        const stdDev20 = calculateStandardDeviation(closes, bbPeriod);
+        const upperBBVisible = sma20.map((s, i) => s === null ? null : s + 2 * stdDev20[i]);
+        const lowerBBVisible = sma20.map((s, i) => s === null ? null : s - 2 * stdDev20[i]);
+
+        // Determine candle colors
+        const increasingColor = '#26a69a';
+        const decreasingColor = '#ef5350';
+
+        // Additional Indicators
+        const macdData = calculateMACD(closes);
+        const rsiData = calculateRSI(closes);
+        const stochData = calculateStochastic(highs, lows, closes);
+
+        // MACD Traces
+        const macdLineTrace = {
+            type: 'scatter', x: visibleDates, y: macdData.macdLine, mode: 'line',
+            line: { color: '#2962FF' }, name: 'MACD', yaxis: 'y4'
+        };
+        const macdSignalTrace = {
+            type: 'scatter', x: visibleDates, y: macdData.signalLine, mode: 'line',
+            line: { color: '#FF6D00' }, name: 'Signal', yaxis: 'y4'
+        };
+        const macdHistogramTrace = {
+            type: 'bar', x: visibleDates, y: macdData.histogram,
+            marker: { color: macdData.histogram.map(h => h >= 0 ? increasingColor : decreasingColor) },
+            name: 'Histogram', yaxis: 'y4'
+        };
+
+        // RSI Trace
+        const rsiTrace = {
+            type: 'scatter', x: visibleDates, y: rsiData, mode: 'line',
+            line: { color: '#AA00FF' }, name: 'RSI', yaxis: 'y2'
+        };
+        const rsiOverbought = { type: 'scatter', x: visibleDates, y: Array(visibleDates.length).fill(70), mode: 'line', line: { color: '#757575', dash: 'dash' }, name: 'RSI 70', yaxis: 'y2', hoverinfo: 'none' };
+        const rsiOversold = { type: 'scatter', x: visibleDates, y: Array(visibleDates.length).fill(30), mode: 'line', line: { color: '#757575', dash: 'dash' }, name: 'RSI 30', yaxis: 'y2', hoverinfo: 'none' };
+
+        // Stochastic Traces
+        const stochKTrace = {
+            type: 'scatter', x: visibleDates, y: stochData.k, mode: 'line',
+            line: { color: '#2962FF' }, name: '%K', yaxis: 'y3'
+        };
+        const stochDTrace = {
+            type: 'scatter', x: visibleDates, y: stochData.d, mode: 'line',
+            line: { color: '#FF6D00' }, name: '%D', yaxis: 'y3'
+        };
+        const stochOverbought = { type: 'scatter', x: visibleDates, y: Array(visibleDates.length).fill(80), mode: 'line', line: { color: '#757575', dash: 'dash' }, name: 'Stoch 80', yaxis: 'y3', hoverinfo: 'none' };
+        const stochOversold = { type: 'scatter', x: visibleDates, y: Array(visibleDates.length).fill(20), mode: 'line', line: { color: '#757575', dash: 'dash' }, name: 'Stoch 20', yaxis: 'y3', hoverinfo: 'none' };
+
+        // Candlestick trace (visible data only)
+        const candleTrace = {
+            type: 'candlestick',
+            x: visibleDates,
+            open: visibleData.map(d => d.open),
+            close: visibleCloses,
+            high: visibleData.map(d => d.high),
+            low: visibleData.map(d => d.low),
+            increasing: { line: { color: increasingColor } },
+            decreasing: { line: { color: decreasingColor } },
+            hoverlabel: {
+                bgcolor: '#1a1a2e',
+                bordercolor: '#4fc3f7',
+                font: { color: '#e0e0e0' }
+            },
+            name: 'Candlesticks'
+        };
+
+        // SMA 200 (primary trend)
+        const sma200Trace = {
+            type: 'scatter',
+            x: visibleDates,
+            y: sma200Visible,
+            mode: 'line',
+            line: { color: '#e91e63', width: 2 },
+            name: 'SMA 200',
+            hoverlabel: {
+                bgcolor: '#1a1a2e',
+                bordercolor: '#e91e63',
+                font: { color: '#e0e0e0' }
+            }
+        };
+
+        // Upper Bollinger Band trace
+        const upperTrace = {
+            type: 'scatter',
+            x: visibleDates,
+            y: upperBBVisible,
+            mode: 'line',
+            line: { color: '#ff9800', width: 1, dash: 'dot' },
+            name: 'Upper BB (2σ)',
+            hoverlabel: {
+                bgcolor: '#1a1a2e',
+                bordercolor: '#ff9800',
+                font: { color: '#e0e0e0' }
+            }
+        };
+
+        // SMA 50 trace
+        const sma50Trace = {
+            type: 'scatter',
+            x: visibleDates,
+            y: sma50Visible,
+            mode: 'line',
+            line: { color: '#4caf50', width: 1 },
+            name: 'SMA 50',
+            hoverlabel: {
+                bgcolor: '#1a1a2e',
+                bordercolor: '#4caf50',
+                font: { color: '#e0e0e0' }
+            }
+        };
+
+        // SMA 20 trace
+        const sma20Trace = {
+            type: 'scatter',
+            x: visibleDates,
+            y: sma20Visible,
+            mode: 'line',
+            line: { color: '#2196f3', width: 1 },
+            name: 'SMA 20',
+            hoverlabel: {
+                bgcolor: '#1a1a2e',
+                bordercolor: '#2196f3',
+                font: { color: '#e0e0e0' }
+            }
+        };
+
+        // Lower Bollinger Band trace
+        const lowerTrace = {
+            type: 'scatter',
+            x: visibleDates,
+            y: lowerBBVisible,
+            mode: 'line',
+            line: { color: '#ff9800', width: 1, dash: 'dot' },
+            name: 'Lower BB (2σ)',
+            hoverlabel: {
+                bgcolor: '#1a1a2e',
+                bordercolor: '#ff9800',
+                font: { color: '#e0e0e0' }
+            }
+        };
+
+        // Base layout template
+        const baseLayout = {
+            plot_bgcolor: '#25253d',
+            paper_bgcolor: '#25253d',
+            margin: { l: 60, r: 30, t: 10, b: 20 },
+            showlegend: false,
+            dragmode: 'zoom',
+            xaxis: {
+                rangeslider: { visible: false },
+                gridcolor: '#4a4a6a',
+                tickfont: { color: '#b0b0c0' },
+                type: 'category',
+                range: [startIdx, data.length - 1] // Sync across all
+            }
+        };
+
+        const config = {
+            responsive: true,
+            displayModeBar: false,
+        };
+
+        // Price Chart
+        const layoutPrice = JSON.parse(JSON.stringify(baseLayout));
+        layoutPrice.title = { text: `${symbol} Price`, font: { size: 14, color: '#e0e0e0' } };
+        layoutPrice.margin.t = 40;
+        layoutPrice.xaxis.showticklabels = false; // Hide x-axis labels
+        layoutPrice.yaxis = {
+            gridcolor: '#4a4a6a',
+            tickfont: { color: '#b0b0c0' },
+            range: [yMin, yMax],
+            fixedrange: false
+        };
+
+        // RSI Chart
+        const layoutRSI = JSON.parse(JSON.stringify(baseLayout));
+        layoutRSI.xaxis.showticklabels = false; // Hide x-axis labels
+        layoutRSI.yaxis = {
+            gridcolor: '#4a4a6a', tickfont: { color: '#b0b0c0' }, title: { text: 'RSI', font: { color: '#e0e0e0', size: 10 } },
+            range: [0, 100], fixedrange: false
+        };
+        rsiTrace.yaxis = 'y'; rsiOverbought.yaxis = 'y'; rsiOversold.yaxis = 'y';
+
+        // Stochastic Chart
+        const layoutStoch = JSON.parse(JSON.stringify(baseLayout));
+        layoutStoch.xaxis.showticklabels = false; // Hide x-axis labels
+        layoutStoch.yaxis = {
+            gridcolor: '#4a4a6a', tickfont: { color: '#b0b0c0' }, title: { text: 'Stoch', font: { color: '#e0e0e0', size: 10 } },
+            range: [0, 100], fixedrange: false
+        };
+        stochKTrace.yaxis = 'y'; stochDTrace.yaxis = 'y'; stochOverbought.yaxis = 'y'; stochOversold.yaxis = 'y';
+
+        // MACD Chart
+        const layoutMACD = JSON.parse(JSON.stringify(baseLayout));
+        // Keep x-axis labels ONLY on the bottom MACD chart, but add enough bottom margin to prevent clipping
+        layoutMACD.margin.b = 60; // Increased to 60 to be absolutely safe
+        layoutMACD.yaxis = {
+            gridcolor: '#4a4a6a', tickfont: { color: '#b0b0c0' }, title: { text: 'MACD', font: { color: '#e0e0e0', size: 10 } },
+            fixedrange: false
+        };
+        macdLineTrace.yaxis = 'y'; macdSignalTrace.yaxis = 'y'; macdHistogramTrace.yaxis = 'y';
+
+        Promise.all([
+            Plotly.newPlot('chartPrice', [candleTrace, sma200Trace, upperTrace, sma50Trace, sma20Trace, lowerTrace], layoutPrice, config),
+            Plotly.newPlot('chartRSI', [rsiOverbought, rsiOversold, rsiTrace], layoutRSI, config),
+            Plotly.newPlot('chartStoch', [stochOverbought, stochOversold, stochKTrace, stochDTrace], layoutStoch, config),
+            Plotly.newPlot('chartMACD', [macdHistogramTrace, macdLineTrace, macdSignalTrace], layoutMACD, config)
+        ]).then(() => {
+            const chartPriceEl = document.getElementById('chartPrice');
+            const chartRSIEl = document.getElementById('chartRSI');
+            const chartStochEl = document.getElementById('chartStoch');
+            const chartMACDEl = document.getElementById('chartMACD');
+
+            // Sync X-Axis Pan/Zoom across all charts
+            let isSyncing = false;
+            function syncCharts(sourceChart, targetCharts) {
+                if (!sourceChart || !sourceChart.on) return;
+                sourceChart.on('plotly_relayout', (event) => {
+                    if (isSyncing) return;
+                    
+                    const update = {};
+                    let hasXUpdate = false;
+
+                    // Sync any property related to the x-axis (range, autorange, etc.)
+                    for (let key in event) {
+                        if (key.startsWith('xaxis')) {
+                            update[key] = event[key];
+                            hasXUpdate = true;
+                        }
+                    }
+
+                    if (hasXUpdate) {
+                        isSyncing = true;
+                        const promises = targetCharts.map(chart => {
+                            if (chart) return Plotly.relayout(chart, update);
+                        }).filter(Boolean);
+                        
+                        Promise.all(promises).then(() => {
+                            isSyncing = false;
+                        }).catch(() => {
+                            isSyncing = false;
+                        });
+                    }
+                });
+            }
+
+            syncCharts(chartPriceEl, [chartRSIEl, chartStochEl, chartMACDEl]);
+            syncCharts(chartRSIEl, [chartPriceEl, chartStochEl, chartMACDEl]);
+            syncCharts(chartStochEl, [chartPriceEl, chartRSIEl, chartMACDEl]);
+            syncCharts(chartMACDEl, [chartPriceEl, chartRSIEl, chartStochEl]);
+
+            // Alt + Scroll Zoom Functionality (Y-axis)
+            [chartPriceEl, chartRSIEl, chartStochEl, chartMACDEl].forEach(el => {
+                if (!el) return;
+                el.addEventListener('wheel', (e) => {
+                    if (e.altKey) {
+                        e.preventDefault();
+                        const fullLayout = el._fullLayout;
+                        if (!fullLayout || !fullLayout.yaxis) return;
+                        
+                        const range = fullLayout.yaxis.range;
+                        const start = range[0];
+                        const end = range[1];
+                        const center = (start + end) / 2;
+                        const height = end - start;
+                        
+                        // Zoom factor: DeltaY > 0 is scroll down (shrink height), < 0 is scroll up (enlarge height)
+                        const zoomFactor = e.deltaY > 0 ? 1.1 : 0.9;
+                        const newHeight = height * zoomFactor;
+                        
+                        const newRange = [
+                            center - newHeight / 2,
+                            center + newHeight / 2
+                        ];
+                        
+                        Plotly.relayout(el, { 'yaxis.range': newRange });
+                    }
+                }, { passive: false });
+            });
+
+            // Add resize observer to allow the user to drag the CSS resize handle and redraw the Plotly chart
+            const resizeObserver = new ResizeObserver(() => {
+                if (chartPriceEl) Plotly.Plots.resize(chartPriceEl);
+                if (chartRSIEl) Plotly.Plots.resize(chartRSIEl);
+                if (chartStochEl) Plotly.Plots.resize(chartStochEl);
+                if (chartMACDEl) Plotly.Plots.resize(chartMACDEl);
+            });
+            resizeObserver.observe(document.getElementById('mainWrapper'));
+
+            let mouseDownPoint = null;
+            
+            if (chartPriceEl && chartPriceEl.on) {
+                chartPriceEl.on('plotly_click', function(data) {
+            console.log('Plotly click event:', data);
+            
+            // Check if Ctrl key is pressed
+            const ctrlKeyPressed = data.event && (data.event.ctrlKey || data.event.metaKey);
+            console.log('Ctrl key pressed:', ctrlKeyPressed);
+            
+            if (ctrlKeyPressed) {
+                const point = data.points[0];
+                
+                // Get the exact Y coordinate from the mouse position
+                const yAxis = chartPriceEl._fullLayout.yaxis;
+                const mouseY = data.event.offsetY !== undefined ? data.event.offsetY : data.event.layerY;
+                const exactY = yAxis.p2d(mouseY - yAxis._offset);
+                
+                if (!mouseDownPoint) {
+                    // Store the resolved exact y-value in the point object
+                    point.resolvedY = exactY;
+                    mouseDownPoint = point;
+                    errorMsg.textContent = 'Click again for second point';
+                    
+                    Plotly.relayout(chartPriceEl, {
+                        shapes: [{
+                            type: 'line',
+                            xref: 'x',
+                            yref: 'y',
+                            x0: mouseDownPoint.x,
+                            y0: mouseDownPoint.resolvedY,
+                            x1: mouseDownPoint.x,
+                            y1: mouseDownPoint.resolvedY,
+                            line: { color: '#9c27b0', width: 2 }
+                        }],
+                        annotations: []
+                    });
+                } else {
+                    const secondPoint = point;
+                    secondPoint.resolvedY = exactY;
+                    
+                    addFibonacciLevels(mouseDownPoint, secondPoint, visibleDates, visibleCloses, chartPriceEl);
+                    
+                    mouseDownPoint = null;
+                    errorMsg.textContent = 'Fibonacci levels added successfully';
+                }
+            }
+        });
+
+        chartPriceEl.on('plotly_unhover', function() {
+            // Optional: Handle unhover if needed
+        });
+    }
+}).catch(err => {
+    console.error('Plotly rendering error:', err);
+});
+}
+
+function addFibonacciLevels(start, end, visibleDates, visibleCloses, chartPriceEl) {
+        if (!start || !end) return;
+
+        const startY = parseFloat(start.resolvedY);
+        const endY = parseFloat(end.resolvedY);
+        
+        const shapes = [];
+        const annotations = [];
+        
+        const fibLevels = [0, 23.6, 38.2, 50, 61.8, 100];
+        
+        let prices = fibLevels.map(level => {
+            return {
+                level: level,
+                // Simple logical mapping: 100% is startY, 0% is endY
+                price: endY - (endY - startY) * (level / 100)
+            };
+        });
+
+        // Sort by price descending (highest price first) to handle colors from top to bottom
+        prices.sort((a, b) => b.price - a.price);
+
+        // We have 6 levels, so 5 intervals. Colors from red (top) to green (bottom)
+        const regionColors = [
+            'rgba(255, 0, 0, 0.15)',     // Top (Red)
+            'rgba(255, 128, 0, 0.15)',   // Orange
+            'rgba(255, 255, 0, 0.15)',   // Yellow
+            'rgba(128, 255, 0, 0.15)',   // Light Green
+            'rgba(0, 255, 0, 0.15)'      // Bottom (Green)
+        ];
+        
+        const firstDate = visibleDates[0];
+        const lastDate = visibleDates[visibleDates.length - 1];
+        
+        // Draw colored regions spanning the whole chart
+        for (let i = 0; i < prices.length - 1; i++) {
+            const upper = prices[i];
+            const lower = prices[i + 1];
+
+            shapes.push({
+                type: 'rect',
+                xref: 'x',
+                yref: 'y',
+                x0: firstDate,
+                y0: upper.price,
+                x1: lastDate,
+                y1: lower.price,
+                fillcolor: regionColors[i],
+                line: { width: 0 },
+                layer: 'below'
+            });
+        }
+
+        // Draw lines and annotations spanning the whole chart
+        prices.forEach(item => {
+            shapes.push({
+                type: 'line',
+                xref: 'x',
+                yref: 'y',
+                x0: firstDate,
+                y0: item.price,
+                x1: lastDate,
+                y1: item.price,
+                line: { 
+                    color: '#9c27b0', 
+                    width: 1, 
+                    dash: 'dash' 
+                }
+            });
+
+            annotations.push({
+                xref: 'x',
+                yref: 'y',
+                x: lastDate,
+                y: item.price,
+                text: item.level + '%',
+                showarrow: false,
+                font: { 
+                    color: '#9c27b0', 
+                    size: 12
+                },
+                xanchor: 'right',
+                yanchor: 'bottom'
+            });
+        });
+
+        // Add trend line marking the original click points
+        shapes.push({
+            type: 'line',
+            xref: 'x',
+            yref: 'y',
+            x0: start.x,
+            y0: startY,
+            x1: end.x,
+            y1: endY,
+            line: { color: '#9c27b0', width: 2 }
+        });
+
+        Plotly.relayout(chartPrice, { shapes: shapes, annotations: annotations });
+    }
+});
