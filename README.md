@@ -28,7 +28,7 @@ A full-stack web application for interactive stock analysis, featuring candlesti
 
 1. **Clone the repository**:
    ```bash
-   git clone tblock-zz/stocksInBrowser
+   git clone https://github.com/tblock-zz/stocksInBrowser.git
    cd stocksInBrowser
    ```
 
