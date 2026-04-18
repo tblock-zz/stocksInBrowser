@@ -17,16 +17,26 @@ document.addEventListener('DOMContentLoaded', function() {
     let mouseDownPoint = null;
     let isWeekly = false;
     let weeklyData = null;
+    // Cached 5-year daily data from the originally loaded symbol
+    let cachedDailyData = null;
+    let originalSymbol = null;
+    // Cached extended daily data (10y+) for better SMA visibility when switching back to daily
+    let cachedExtendedDailyData = null;
+    // History period to fetch when in weekly mode (default: 10y for better SMA 200 visibility)
+    let weeklyHistoryPeriod = '10y';
 
     // Set default symbol and auto-load
     tickerInput.value = 'SPY';
-    loadStockData('SPY');
+    fetchAndRender('SPY', '5y');
 
     // Event listeners
     loadBtn.addEventListener('click', () => {
         const symbol = tickerInput.value.trim().toUpperCase();
         if (symbol) {
-            loadStockData(symbol);
+            // Reset cache when user explicitly loads a new symbol
+            cachedDailyData = null;
+            originalSymbol = null;
+            fetchAndRender(symbol, '5y');
         }
     });
 
@@ -34,7 +44,10 @@ document.addEventListener('DOMContentLoaded', function() {
         if (e.key === 'Enter') {
             const symbol = tickerInput.value.trim().toUpperCase();
             if (symbol) {
-                loadStockData(symbol);
+                // Reset cache when user explicitly loads a new symbol
+                cachedDailyData = null;
+                originalSymbol = null;
+                fetchAndRender(symbol, '5y');
             }
         }
     });
@@ -44,17 +57,28 @@ document.addEventListener('DOMContentLoaded', function() {
         isWeekly = !isWeekly;
         weeklyToggleBtn.textContent = isWeekly ? 'Daily' : 'Weekly';
         weeklyToggleBtn.classList.toggle('active', isWeekly);
-        if (weeklyData) {
-            renderChart(isWeekly ? weeklyData : loadStockData._lastDailyData, tickerInput.value.trim().toUpperCase());
+        if (isWeekly) {
+            // Fetch longer history for better SMA 200 visibility in weekly mode
+            const symbol = tickerInput.value.trim().toUpperCase();
+            fetchAndRender(symbol, weeklyHistoryPeriod);
+        } else {
+            // Switch back to daily — use cached data (prefer extended 10y for better SMA visibility)
+            const currentSymbol = tickerInput.value.trim().toUpperCase();
+            const dailyData = cachedExtendedDailyData || cachedDailyData;
+            if (currentSymbol === originalSymbol && dailyData) {
+                renderChart(dailyData, currentSymbol);
+            } else {
+                fetchAndRender(currentSymbol, '5y');
+            }
         }
     });
 
-    async function loadStockData(symbol) {
+    async function fetchAndRender(symbol, period) {
         errorMsg.textContent = '';
         
         try {
             // Append timestamp to prevent browser caching
-            const response = await fetch(`/api/stock/${symbol}?t=${Date.now()}`);
+            const response = await fetch(`/api/stock/${symbol}?t=${Date.now()}&period=${period}`);
             const data = await response.json();
 
             if (!response.ok) {
@@ -82,7 +106,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
             }
 
-            loadStockData._lastDailyData = data;
+            // Cache the 5-year daily data from the originally loaded symbol
+            if (!originalSymbol) {
+                cachedDailyData = data;
+                originalSymbol = symbol;
+            }
+            // Cache extended daily data when fetching more history for weekly mode
+            if (period !== '5y') {
+                cachedExtendedDailyData = data;
+            }
             
             weeklyData = aggregateToWeekly(data);
             

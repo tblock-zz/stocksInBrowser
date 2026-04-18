@@ -16,12 +16,13 @@ A full-stack web application for interactive stock analysis, featuring candlesti
     - **Smart Scaling**: Independent Y-axis scaling via `ALT + Scroll` over any specific panel.
 - **Company Information Display**: Comprehensive company details including sector, industry, market cap, P/E ratio, earnings dates, and analyst recommendations.
 - **Weekly Candlestick View**: Toggle between daily and weekly candlesticks, computed from the same underlying data.
+- **Configurable Weekly History**: Fetch 10 years of historical data in weekly mode for better SMA 200 visibility (vs. 5 years in daily mode).
 - **Responsive Design**: Dark-themed UI that adapts to different screen sizes.
 
 ## Project Structure
 
 - `app.py`: Flask backend serving the application and providing APIs to fetch historical stock data and company information from Yahoo Finance.
-    - `/api/stock/<symbol>`: Returns 5 years of OHLCV data (daily granularity)
+    - `/api/stock/<symbol>`: Returns OHLCV data. Query param `?period=` controls history length: `5y` (default), `10y`, `15y`, `max`. Weekly mode uses `10y` by default for better SMA 200 visibility.
     - `/api/stock_info/<symbol>`: Returns comprehensive company information (sector, industry, market cap, P/E ratio, earnings dates, recommendations, etc.)
 - `index.html`: Main application interface, including the structure for Plotly.js charts and company information display section.
 - `app.js`: Core frontend logic, implementing technical analysis calculations, weekly aggregation, chart rendering, event synchronization, Fibonacci tools, and company info loading with formatting helpers.
@@ -80,8 +81,8 @@ A full-stack web application for interactive stock analysis, featuring candlesti
 
 ### Backend
 - **Framework**: Python Flask
-- **Data Provider**: `yfinance` library fetching 5 years of historical OHLCV data.
-- **Data Flow**: The backend serves as a proxy, fetching raw data from Yahoo Finance and providing a JSON API for the frontend.
+- **Data Provider**: `yfinance` library fetching configurable history (5y default, 10y in weekly mode) of historical OHLCV data.
+- **Data Flow**: The backend serves as a proxy, fetching raw data from Yahoo Finance based on the `?period=` query parameter and providing a JSON API for the frontend.
 
 ### Frontend
 - **Visualization**: Plotly.js for high-performance interactive charting.
@@ -89,15 +90,17 @@ A full-stack web application for interactive stock analysis, featuring candlesti
 - **Logic**: Vanilla JavaScript handles indicator mathematics (MACD, RSI, Stoch), event synchronization, and state management.
 
 ### Technical Layers
-1. **Data Layer**: Fetches 5 years of history to ensure indicators like SMA 200 are fully calculated from the start of the visible 2-year window.
+1. **Data Layer**: Fetches configurable history (5y default, 10y in weekly mode) to ensure indicators like SMA 200 are fully calculated from the start of the visible window.
 2. **Calculation Layer**: Client-side implementation of technical analysis algorithms and weekly OHLCV aggregation.
 3. **Sync Layer**: Propagates X-axis changes (pan/zoom/reset) across all subplots to keep indicators aligned with price.
 
 ### Weekly Candlestick View
-- **Data Source**: Computed client-side from the 5-year daily data already fetched by the backend.
+- **Data Source**: Computed client-side from the daily data fetched by the backend.
+- **History Period**: Daily mode fetches 5 years; weekly mode fetches 10 years (configurable) for better SMA 200 visibility.
+- **Extended Daily Data Caching**: The 10y daily data fetched for weekly mode is cached and reused when switching back to daily — no re-fetch needed. SMA 200 appears far left on the daily chart.
 - **Aggregation Logic**: Groups daily candles by ISO week number (`YYYY-Www`). Open = first trading day's open, Close = last trading day's close, High = max of all highs, Low = min of all lows.
 - **Indicator Behavior**: All indicators (SMA, Bollinger, RSI, MACD, Stochastic) are recalculated on the weekly granularity using the same parameter values (e.g., SMA 200 on weekly = 200 weeks ≈ 4 years).
-- **Toggle**: Instant switching between daily and weekly modes via cached data — no re-fetch required.
+- **Toggle**: Instant switching between daily and weekly modes via cached data — no re-fetch required. When switching to weekly, a re-fetch is triggered with the configured history period.
 - **X-Axis**: Monthly tick labels in weekly mode for readability.
 
 ### Company Information
