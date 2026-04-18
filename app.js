@@ -15,6 +15,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     let splitInstance = null;
     let mouseDownPoint = null;
+    let isWeekly = false;
+    let weeklyData = null;
 
     // Set default symbol and auto-load
     tickerInput.value = 'SPY';
@@ -34,6 +36,16 @@ document.addEventListener('DOMContentLoaded', function() {
             if (symbol) {
                 loadStockData(symbol);
             }
+        }
+    });
+
+    const weeklyToggleBtn = document.getElementById('weeklyToggle');
+    weeklyToggleBtn.addEventListener('click', () => {
+        isWeekly = !isWeekly;
+        weeklyToggleBtn.textContent = isWeekly ? 'Daily' : 'Weekly';
+        weeklyToggleBtn.classList.toggle('active', isWeekly);
+        if (weeklyData) {
+            renderChart(isWeekly ? weeklyData : loadStockData._lastDailyData, tickerInput.value.trim().toUpperCase());
         }
     });
 
@@ -70,7 +82,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
             }
 
-            renderChart(data, symbol);
+            loadStockData._lastDailyData = data;
+            
+            weeklyData = aggregateToWeekly(data);
+            
+            renderChart(isWeekly ? weeklyData : data, symbol);
             
             // Load company info
             loadCompanyInfo(symbol);
@@ -208,6 +224,45 @@ document.addEventListener('DOMContentLoaded', function() {
             return formatDate(tsValue);
         }
         return 'N/A';
+    }
+
+    // Get ISO week key for a date string (e.g., "2025-W15")
+    // Uses ISO week numbering to handle跨年 weeks correctly
+    function getWeekKey(dateStr) {
+        const date = new Date(dateStr + 'T00:00:00');
+        const year = date.getFullYear();
+        const jan1 = new Date(year, 0, 1);
+        const daysSinceJan1 = Math.floor((date - jan1) / (24 * 60 * 60 * 1000));
+        const weekNum = Math.ceil((daysSinceJan1 + jan1.getDay() + 1) / 7);
+        return `${year}-W${String(weekNum).padStart(2, '0')}`;
+    }
+
+    // Aggregate daily OHLCV data into weekly candles grouped by ISO week key
+    // Open = first trading day, Close = last trading day, High = max, Low = min
+    function aggregateToWeekly(dailyData) {
+        const weeks = new Map();
+        
+        for (const daily of dailyData) {
+            const weekKey = getWeekKey(daily.date);
+            
+            if (!weeks.has(weekKey)) {
+                weeks.set(weekKey, {
+                    date: weekKey,
+                    open: daily.open,
+                    close: daily.close,
+                    high: daily.high,
+                    low: daily.low,
+                });
+            } else {
+                const existing = weeks.get(weekKey);
+                existing.close = daily.close;
+                existing.high = Math.max(existing.high, daily.high);
+                existing.low = Math.min(existing.low, daily.low);
+            }
+        }
+        
+        return Array.from(weeks.values())
+            .sort((a, b) => a.date.localeCompare(b.date));
     }
 
     function calculateSMA(values, period) {
@@ -567,6 +622,29 @@ document.addEventListener('DOMContentLoaded', function() {
                 range: [startIdx, data.length - 1] // Sync across all
             }
         };
+
+        // Weekly view: show fewer X-axis ticks (monthly)
+        if (isWeekly) {
+            const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+            const monthlyTickDates = [];
+            let lastLabel = '';
+            for (let i = 0; i < visibleDates.length; i++) {
+                const weekKey = visibleData[i].date;
+                const [yearStr, weekStr] = weekKey.split('-W');
+                const weekNum = parseInt(weekStr);
+                const year = parseInt(yearStr);
+                const monthIdx = Math.min(11, Math.floor((weekNum - 1) / 4.345));
+                const label = monthNames[monthIdx] + ' ' + String(year).slice(2);
+                if (label !== lastLabel) {
+                    monthlyTickDates.push({ step: i, label: label });
+                    lastLabel = label;
+                }
+            }
+            if (monthlyTickDates.length > 0) {
+                baseLayout.xaxis.tickvals = monthlyTickDates.map(t => t.step);
+                baseLayout.xaxis.ticktext = monthlyTickDates.map(t => t.label);
+            }
+        }
 
         const config = {
             responsive: true,
