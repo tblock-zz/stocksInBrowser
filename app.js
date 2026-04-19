@@ -365,6 +365,9 @@ document.addEventListener('DOMContentLoaded', function() {
             div.addEventListener('click', () => {
                 tickerInput.value = item.symbol;
                 tickerDropdown.style.display = 'none';
+                cachedDailyData = null;
+                originalSymbol = null;
+                fetchAndRender(item.symbol, '5y');
             });
             
             tickerDropdown.appendChild(div);
