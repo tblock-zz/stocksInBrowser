@@ -26,4 +26,5 @@ share/python-wheels/
 .installed.cfg
 *.egg
 memory/
+# spec/ directory for internal planning documents — do not commit
 spec/
