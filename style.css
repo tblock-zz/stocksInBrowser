@@ -251,3 +251,58 @@ h1 {
     line-height: 1.6;
     font-size: 0.95rem;
 }
+
+/* Fear & Greed Section */
+.fear-greed-section h3 {
+    color: #4fc3f7;
+    margin-bottom: 15px;
+    font-size: 1.1rem;
+}
+
+.fear-greed-bar-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
+.fear-greed-bar {
+    flex: 1;
+    height: 24px;
+    border-radius: 12px;
+    background: linear-gradient(to right, #d32f2f 0%, #f44336 12.5%, #ff9800 25%, #fff176 37.5%, #f6f6f6 50%, #fff176 62.5%, #4caf50 75%, #2e7d32 87.5%, #1b5e20 100%);
+    position: relative;
+    overflow: visible;
+}
+
+.fear-greed-bar::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 3px solid #fff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+    background: #fff;
+    transition: left 0.5s ease;
+}
+
+.fear-greed-value {
+    font-size: 1.4rem;
+    font-weight: bold;
+    min-width: 48px;
+    text-align: right;
+}
+
+.fear-greed-label {
+    font-size: 0.95rem;
+    font-weight: 500;
+    margin-bottom: 4px;
+}
+
+.fear-greed-date {
+    font-size: 0.8rem;
+    color: #888;
+}

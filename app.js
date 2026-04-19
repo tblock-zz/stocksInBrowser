@@ -12,6 +12,11 @@ document.addEventListener('DOMContentLoaded', function() {
     const companyName = document.getElementById('companyName');
     const companyDetails = document.getElementById('companyDetails');
     const companySummary = document.getElementById('companySummary');
+    const fearGreedSection = document.getElementById('fearGreedSection');
+    const fearGreedBar = document.getElementById('fearGreedBar');
+    const fearGreedValue = document.getElementById('fearGreedValue');
+    const fearGreedLabel = document.getElementById('fearGreedLabel');
+    const fearGreedDate = document.getElementById('fearGreedDate');
 
     let splitInstance = null;
     let mouseDownPoint = null;
@@ -122,6 +127,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Load company info
             loadCompanyInfo(symbol);
+            loadFearAndGreed();
 
         } catch (error) {
             errorMsg.textContent = `Error: ${error.message}`;
@@ -210,6 +216,60 @@ document.addEventListener('DOMContentLoaded', function() {
         } catch (error) {
             console.error("Failed to load company info:", error);
             companyInfoWrapper.style.display = 'none';
+        }
+    }
+    
+    async function loadFearAndGreed() {
+        try {
+            const response = await fetch(`/api/fear_and_greed?t=${Date.now()}`);
+            if (!response.ok) {
+                fearGreedSection.style.display = 'none';
+                return;
+            }
+            const fg = await response.json();
+            if (fg.error) {
+                fearGreedSection.style.display = 'none';
+                return;
+            }
+            
+            const value = fg.value;
+            const clampedValue = Math.max(0, Math.min(100, value));
+            const percentage = (clampedValue / 100) * 100;
+            
+            fearGreedBar.style.setProperty('--bar-pos', percentage + '%');
+            fearGreedBar.style.background = `linear-gradient(to right, #d32f2f 0%, #f44336 12.5%, #ff9800 25%, #fff176 37.5%, #f6f6f6 50%, #fff176 62.5%, #4caf50 75%, #2e7d32 87.5%, #1b5e20 100%)`;
+            
+            const indicator = fearGreedBar.querySelector('.fg-indicator') || document.createElement('div');
+            indicator.className = 'fg-indicator';
+            indicator.style.cssText = `position:absolute;top:50%;width:20px;height:20px;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.4);background:#fff;transform:translate(-50%,-50%);left:${percentage}%;transition:left 0.5s ease;`;
+            if (!fearGreedBar.querySelector('.fg-indicator')) {
+                fearGreedBar.appendChild(indicator);
+            } else {
+                indicator.style.left = percentage + '%';
+            }
+            
+            let color, label;
+            if (clampedValue < 20) { color = '#d32f2f'; label = 'Extreme Fear'; }
+            else if (clampedValue < 40) { color = '#f44336'; label = 'Fear'; }
+            else if (clampedValue < 60) { color = '#ff9800'; label = 'Neutral'; }
+            else if (clampedValue < 80) { color = '#4caf50'; label = 'Greed'; }
+            else { color = '#2e7d32'; label = 'Extreme Greed'; }
+            
+            fearGreedValue.textContent = Math.round(clampedValue);
+            fearGreedValue.style.color = color;
+            fearGreedLabel.textContent = label;
+            fearGreedLabel.style.color = color;
+            
+            if (fg.last_update) {
+                const d = new Date(fg.last_update);
+                fearGreedDate.textContent = 'Last update: ' + d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+            }
+            
+            fearGreedSection.style.display = 'block';
+            
+        } catch (error) {
+            console.error("Failed to load Fear & Greed index:", error);
+            fearGreedSection.style.display = 'none';
         }
     }
     

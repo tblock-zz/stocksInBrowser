@@ -1,6 +1,7 @@
 from flask import Flask, jsonify, render_template, request
 import yfinance as yf
 from flask_cors import CORS
+from fear_and_greed.cnn import get as get_fear_and_greed
 import os
 
 app = Flask(__name__, 
@@ -63,6 +64,19 @@ def get_stock_info(symbol):
             return jsonify({'error': 'No substantial company information found'}), 404
             
         return jsonify(info)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/fear_and_greed')
+def get_fear_and_greed_index():
+    try:
+        fg = get_fear_and_greed()
+        return jsonify({
+            'value': fg.value,
+            'description': fg.description,
+            'last_update': fg.last_update.isoformat()
+        })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

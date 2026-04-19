@@ -15,6 +15,7 @@ A full-stack web application for interactive stock analysis, featuring candlesti
     - **Synchronized X-Axis**: Pan and zoom across all panels simultaneously.
     - **Smart Scaling**: Independent Y-axis scaling via `ALT + Scroll` over any specific panel.
 - **Company Information Display**: Comprehensive company details including sector, industry, market cap, P/E ratio, earnings dates, and analyst recommendations.
+- **CNN Fear & Greed Index**: Displays the market sentiment index as a color-coded bar (0-100) with the current value and label (Extreme Fear → Extreme Greed) alongside company information.
 - **Weekly Candlestick View**: Toggle between daily and weekly candlesticks, computed from the same underlying data.
 - **Configurable Weekly History**: Fetch 10 years of historical data in weekly mode for better SMA 200 visibility (vs. 5 years in daily mode).
 - **Responsive Design**: Dark-themed UI that adapts to different screen sizes.
@@ -24,6 +25,7 @@ A full-stack web application for interactive stock analysis, featuring candlesti
 - `app.py`: Flask backend serving the application and providing APIs to fetch historical stock data and company information from Yahoo Finance.
     - `/api/stock/<symbol>`: Returns OHLCV data. Query param `?period=` controls history length: `5y` (default), `10y`, `15y`, `max`. Weekly mode uses `10y` by default for better SMA 200 visibility.
     - `/api/stock_info/<symbol>`: Returns comprehensive company information (sector, industry, market cap, P/E ratio, earnings dates, recommendations, etc.)
+    - `/api/fear_and_greed`: Returns CNN Fear & Greed Index (value 0-100, description, last_update)
 - `index.html`: Main application interface, including the structure for Plotly.js charts and company information display section.
 - `app.js`: Core frontend logic, implementing technical analysis calculations, weekly aggregation, chart rendering, event synchronization, Fibonacci tools, and company info loading with formatting helpers.
 - `style.css`: Custom dark-theme styling, including layout management, Split.js gutter configurations, and responsive company info grid display.
@@ -113,3 +115,8 @@ A full-stack web application for interactive stock analysis, featuring candlesti
     - Earnings: Earnings Date (next expected earnings report)
     - Analyst Ratings: Recommendation (Buy, Hold, Sell, etc.)
 - **Formatting**: Smart number formatting with M/B/K suffixes for large numbers and date conversion from Unix timestamps.
+
+### CNN Fear & Greed Index
+- **Data Source**: CNN Fear & Greed Index
+- **Display**: Color-coded bar (red = Extreme Fear → green = Extreme Greed) with numeric value (0-100) and sentiment label
+- **Sentiment Categories**: Extreme Fear (<20), Fear (20-40), Neutral (40-60), Greed (60-80), Extreme Greed (>80)
