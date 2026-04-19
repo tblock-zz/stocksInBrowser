@@ -747,6 +747,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const layoutPrice = JSON.parse(JSON.stringify(baseLayout));
         layoutPrice.title = { text: `${symbol} Price`, font: { size: 14, color: '#e0e0e0' } };
         layoutPrice.margin.t = 40;
+        layoutPrice.margin.b = 40; // Extra bottom margin for hover date display
         layoutPrice.xaxis.showticklabels = false; // Hide x-axis labels
         layoutPrice.yaxis = {
             gridcolor: '#4a4a6a',
