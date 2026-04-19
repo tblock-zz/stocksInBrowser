@@ -16,6 +16,7 @@ A full-stack web application for interactive stock analysis, featuring candlesti
     - **Smart Scaling**: Independent Y-axis scaling via `ALT + Scroll` over any specific panel.
 - **Company Information Display**: Comprehensive company details including sector, industry, market cap, P/E ratio, earnings dates, and analyst recommendations.
 - **CNN Fear & Greed Index**: Displays the market sentiment index as a color-coded bar (0-100) with the current value and label (Extreme Fear → Extreme Greed) alongside company information.
+- **Ticker Search with Autocomplete**: Type any ticker symbol to get live suggestions from Yahoo Finance, showing symbol, company name, exchange, and type.
 - **Weekly Candlestick View**: Toggle between daily and weekly candlesticks, computed from the same underlying data.
 - **Configurable Weekly History**: Fetch 10 years of historical data in weekly mode for better SMA 200 visibility (vs. 5 years in daily mode).
 - **Responsive Design**: Dark-themed UI that adapts to different screen sizes.
@@ -26,6 +27,7 @@ A full-stack web application for interactive stock analysis, featuring candlesti
     - `/api/stock/<symbol>`: Returns OHLCV data. Query param `?period=` controls history length: `5y` (default), `10y`, `15y`, `max`. Weekly mode uses `10y` by default for better SMA 200 visibility.
     - `/api/stock_info/<symbol>`: Returns comprehensive company information (sector, industry, market cap, P/E ratio, earnings dates, recommendations, etc.)
     - `/api/fear_and_greed`: Returns CNN Fear & Greed Index (value 0-100, description, last_update)
+    - `/api/search?q=<query>`: Returns ticker search results (symbol, shortname, longname, exchange, type)
 - `index.html`: Main application interface, including the structure for Plotly.js charts and company information display section.
 - `app.js`: Core frontend logic, implementing technical analysis calculations, weekly aggregation, chart rendering, event synchronization, Fibonacci tools, and company info loading with formatting helpers.
 - `style.css`: Custom dark-theme styling, including layout management, Split.js gutter configurations, and responsive company info grid display.
@@ -68,6 +70,7 @@ A full-stack web application for interactive stock analysis, featuring candlesti
 ## Usage
 
 - **Loading Data**: Enter a ticker symbol (e.g., `SPY`, `BTC-USD`) in the input field and click **Load Chart**.
+- **Ticker Search**: Start typing in the input field to get live suggestions from Yahoo Finance. Click a suggestion to auto-fill the ticker symbol.
 - **Weekly Candlesticks**: Click the **Weekly** toggle button between the input field and **Load Chart** to switch to weekly view. The button text flips to **Daily** when in weekly mode. Toggle back anytime — no re-fetch required.
 - **Company Information**: After loading chart data, company information is automatically displayed below the charts with details like sector, industry, market cap, P/E ratio, earnings dates, and analyst recommendations.
 - **Navigation**:
@@ -83,7 +86,7 @@ A full-stack web application for interactive stock analysis, featuring candlesti
 
 ### Backend
 - **Framework**: Python Flask
-- **Data Provider**: `yfinance` library fetching configurable history (5y default, 10y in weekly mode) of historical OHLCV data.
+- **Data Provider**: `yfinance` library fetching configurable history (5y default, 10y in weekly mode) of historical OHLCV data and ticker search.
 - **Data Flow**: The backend serves as a proxy, fetching raw data from Yahoo Finance based on the `?period=` query parameter and providing a JSON API for the frontend.
 
 ### Frontend

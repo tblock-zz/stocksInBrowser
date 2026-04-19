@@ -17,6 +17,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const fearGreedValue = document.getElementById('fearGreedValue');
     const fearGreedLabel = document.getElementById('fearGreedLabel');
     const fearGreedDate = document.getElementById('fearGreedDate');
+    const tickerDropdown = document.getElementById('tickerDropdown');
 
     let splitInstance = null;
     let mouseDownPoint = null;
@@ -29,6 +30,9 @@ document.addEventListener('DOMContentLoaded', function() {
     let cachedExtendedDailyData = null;
     // History period to fetch when in weekly mode (default: 10y for better SMA 200 visibility)
     let weeklyHistoryPeriod = '10y';
+    // Ticker search state
+    let searchAbortController = null;
+    let searchDebounceTimer = null;
 
     // Set default symbol and auto-load
     tickerInput.value = 'SPY';
@@ -54,6 +58,38 @@ document.addEventListener('DOMContentLoaded', function() {
                 originalSymbol = null;
                 fetchAndRender(symbol, '5y');
             }
+        }
+    });
+
+    tickerInput.addEventListener('input', () => {
+        const query = tickerInput.value.trim();
+        
+        if (query.length < 2) {
+            tickerDropdown.style.display = 'none';
+            return;
+        }
+        
+        // Cancel previous search
+        if (searchAbortController) {
+            searchAbortController.abort();
+        }
+        
+        // Debounce
+        clearTimeout(searchDebounceTimer);
+        searchDebounceTimer = setTimeout(() => {
+            searchTicker(query);
+        }, 300);
+    });
+
+    tickerInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            tickerDropdown.style.display = 'none';
+        }
+    });
+
+    document.addEventListener('click', (e) => {
+        if (!tickerInput.contains(e.target) && !tickerDropdown.contains(e.target)) {
+            tickerDropdown.style.display = 'none';
         }
     });
 
@@ -271,6 +307,70 @@ document.addEventListener('DOMContentLoaded', function() {
             console.error("Failed to load Fear & Greed index:", error);
             fearGreedSection.style.display = 'none';
         }
+    }
+    
+    async function searchTicker(query) {
+        if (searchAbortController) {
+            searchAbortController.abort();
+        }
+        searchAbortController = new AbortController();
+        
+        try {
+            const response = await fetch(`/api/search?q=${encodeURIComponent(query)}&t=${Date.now()}`, {
+                signal: searchAbortController.signal
+            });
+            
+            if (!response.ok) {
+                tickerDropdown.style.display = 'none';
+                return;
+            }
+            
+            const results = await response.json();
+            renderTickerDropdown(results);
+        } catch (error) {
+            if (error.name !== 'AbortError') {
+                console.error("Ticker search failed:", error);
+            }
+        }
+    }
+    
+    function renderTickerDropdown(results) {
+        if (!results || results.length === 0) {
+            tickerDropdown.style.display = 'none';
+            return;
+        }
+        
+        tickerDropdown.innerHTML = '';
+        
+        for (const item of results) {
+            const div = document.createElement('div');
+            div.className = 'ticker-search-item';
+            
+            const symbolSpan = document.createElement('span');
+            symbolSpan.className = 'item-symbol';
+            symbolSpan.textContent = item.symbol;
+            
+            const nameSpan = document.createElement('span');
+            nameSpan.className = 'item-name';
+            nameSpan.textContent = item.longname || item.shortname || '';
+            
+            const exchangeSpan = document.createElement('span');
+            exchangeSpan.className = 'item-exchange';
+            exchangeSpan.textContent = `${item.exchange} · ${item.type}`;
+            
+            div.appendChild(symbolSpan);
+            div.appendChild(nameSpan);
+            div.appendChild(exchangeSpan);
+            
+            div.addEventListener('click', () => {
+                tickerInput.value = item.symbol;
+                tickerDropdown.style.display = 'none';
+            });
+            
+            tickerDropdown.appendChild(div);
+        }
+        
+        tickerDropdown.style.display = 'block';
     }
     
     function formatValue(val) {

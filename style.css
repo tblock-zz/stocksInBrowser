@@ -29,6 +29,85 @@ h1 {
     justify-content: center;
     gap: 15px;
     margin-bottom: 30px;
+    align-items: flex-start;
+}
+
+.ticker-input-wrapper {
+    position: relative;
+    width: 300px;
+}
+
+.ticker-search-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background-color: #2d2d44;
+    border: 2px solid #4fc3f7;
+    border-radius: 8px;
+    margin-top: 4px;
+    max-height: 240px;
+    overflow-y: auto;
+    z-index: 100;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.ticker-search-dropdown::-webkit-scrollbar {
+    width: 8px;
+}
+
+.ticker-search-dropdown::-webkit-scrollbar-track {
+    background: #1a1a2e;
+    border-radius: 4px;
+}
+
+.ticker-search-dropdown::-webkit-scrollbar-thumb {
+    background: #4a4a6a;
+    border-radius: 4px;
+}
+
+.ticker-search-dropdown::-webkit-scrollbar-thumb:hover {
+    background: #4fc3f7;
+}
+
+.ticker-search-item {
+    padding: 10px 15px;
+    cursor: pointer;
+    border-bottom: 1px solid #363654;
+    display: flex;
+    align-items: center;
+    transition: background-color 0.15s;
+}
+
+.ticker-search-item:last-child {
+    border-bottom: none;
+}
+
+.ticker-search-item:hover {
+    background-color: #3a3a54;
+}
+
+.ticker-search-item .item-symbol {
+    font-weight: bold;
+    color: #4fc3f7;
+    min-width: 70px;
+    font-size: 0.95rem;
+}
+
+.ticker-search-item .item-name {
+    flex: 1;
+    color: #b0b0c0;
+    font-size: 0.9rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.ticker-search-item .item-exchange {
+    color: #6a6a8a;
+    font-size: 0.8rem;
+    min-width: 100px;
+    text-align: right;
 }
 
 #tickerInput {

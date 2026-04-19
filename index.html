@@ -13,7 +13,10 @@
         <h1>Stock Candlestick Chart</h1>
         
         <div class="input-section">
-            <input type="text" id="tickerInput" placeholder="Enter ticker symbol (e.g., SPY, GOOG)" maxlength="10">
+            <div class="ticker-input-wrapper">
+                <input type="text" id="tickerInput" placeholder="Enter ticker symbol (e.g., SPY, GOOG)" maxlength="10">
+                <div class="ticker-search-dropdown" id="tickerDropdown" style="display: none;"></div>
+            </div>
             <button id="weeklyToggle" class="toggle-btn">Weekly</button>
             <button id="loadBtn">Load Chart</button>
         </div>
@@ -50,6 +53,6 @@
     </div>
 
     <!-- Added timestamp to force browser to load latest JS -->
-    <script src="app.js?v=12"></script>
+    <script src="app.js?v=13"></script>
 </body>
 </html>

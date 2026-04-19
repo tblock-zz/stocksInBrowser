@@ -68,6 +68,31 @@ def get_stock_info(symbol):
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/search')
+def search_tickers():
+    query = request.args.get('q', '').strip()
+    if len(query) < 2:
+        return jsonify([])
+    
+    try:
+        search_obj = yf.Search(query)
+        quotes = getattr(search_obj, 'quotes', [])
+        results = []
+        for q in quotes:
+            symbol = q.get('symbol')
+            if symbol:
+                results.append({
+                    'symbol': symbol,
+                    'shortname': q.get('shortname', ''),
+                    'longname': q.get('longname', ''),
+                    'exchange': q.get('exchDisp', q.get('exchange', '')),
+                    'type': q.get('typeDisp', q.get('quoteType', ''))
+                })
+        return jsonify(results)
+    except Exception as e:
+        return jsonify([]), 500
+
+
 @app.route('/api/fear_and_greed')
 def get_fear_and_greed_index():
     try:
