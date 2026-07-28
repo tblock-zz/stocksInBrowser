@@ -21,6 +21,10 @@ A full-stack web application for interactive stock analysis, featuring candlesti
 - **Configurable Weekly History**: Fetch 10 years of historical data in weekly mode for better SMA 200 visibility (vs. 5 years in daily mode).
 - **Responsive Design**: Dark-themed UI that adapts to different screen sizes.
 
+## Screenshot
+
+![StocksInBrowser Screenshot — SPY with candlesticks, SMA 200, Bollinger Bands, Fibonacci retracement, RSI/Stochastic/MACD oscillators, company info and CNN Fear & Greed Index](./StocksInBrowserChart.png)
+
 ## Project Structure
 
 - `app.py`: Flask backend serving the application and providing APIs to fetch historical stock data and company information from Yahoo Finance.
