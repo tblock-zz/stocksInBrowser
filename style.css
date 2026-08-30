@@ -354,20 +354,6 @@ h1 {
     overflow: visible;
 }
 
-.fear-greed-bar::after {
-    content: '';
-    position: absolute;
-    top: 50%;
-    transform: translate(-50%, -50%);
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    border: 3px solid #fff;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
-    background: #fff;
-    transition: left 0.5s ease;
-}
-
 .fear-greed-value {
     font-size: 1.4rem;
     font-weight: bold;
