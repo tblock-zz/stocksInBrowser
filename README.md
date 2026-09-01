@@ -36,8 +36,29 @@ A full-stack web application for interactive stock analysis, featuring candlesti
 - `app.js`: Core frontend logic, implementing technical analysis calculations, weekly aggregation, chart rendering, event synchronization, Fibonacci tools, and company info loading with formatting helpers.
 - `style.css`: Custom dark-theme styling, including layout management, Split.js gutter configurations, and responsive company info grid display.
 - `requirements.txt`: Python dependencies for the backend.
+- `run.sh`: Start script for Linux/macOS — creates/activates the virtual environment, installs dependencies on first run, and launches the server.
 
 ## Installation
+
+1. **Clone the repository**:
+   ```bash
+   git clone https://github.com/tblock-zz/stocksInBrowser.git
+   cd stocksInBrowser
+   ```
+
+Call the start script, which handles everything automatically after cloning the repository:
+
+```bash
+./run.sh
+```
+
+The script (Linux/macOS):
+1. Creates a `.venv` virtual environment if it does not exist yet
+2. Installs all dependencies from `requirements.txt` (only on first run)
+3. Activates the virtual environment
+4. Starts the server on `http://127.0.0.1:5000`
+
+### Manual installation
 
 1. **Clone the repository**:
    ```bash
@@ -48,7 +69,7 @@ A full-stack web application for interactive stock analysis, featuring candlesti
 2. **Create and activate a virtual environment**:
    ```bash
    # Create the virtual environment
-   python -m venv .venv
+   python3 -m venv .venv
 
    # Activate it (Linux/macOS)
    source .venv/bin/activate
@@ -61,7 +82,7 @@ A full-stack web application for interactive stock analysis, featuring candlesti
    ```bash
    pip install -r requirements.txt
    ```
-   *(Note: Requirements include `flask`, `flask-cors`, and `yfinance`)*
+   *(Note: Requirements include `flask`, `flask-cors`, `yfinance`, and `waitress`)*
 
 4. **Launch the server**:
    ```bash
@@ -70,6 +91,10 @@ A full-stack web application for interactive stock analysis, featuring candlesti
 
 5. **Access the application**:
    Open your browser and navigate to `http://127.0.0.1:5000`.
+
+## Production Server
+
+The app runs with **waitress**, a production-ready WSGI server, instead of the Flask development server. This means no development-mode warnings and more stable handling of concurrent requests. Code changes require a server restart (no auto-reload).
 
 ## Usage
 
@@ -90,7 +115,9 @@ A full-stack web application for interactive stock analysis, featuring candlesti
 
 ### Backend
 - **Framework**: Python Flask
+- **WSGI Server**: waitress (production-ready, used instead of the Flask dev server)
 - **Data Provider**: `yfinance` library fetching configurable history (5y default, 10y in weekly mode) of historical OHLCV data and ticker search.
+- **Live Candle Guarantee**: If Yahoo's daily history lags intraday (missing/stale candle for the current trading day), a live candle is built from real-time quote data (`regularMarketPrice`, Open, Day High/Low) and appended/replaced, so the youngest candle always reflects the current day.
 - **Data Flow**: The backend serves as a proxy, fetching raw data from Yahoo Finance based on the `?period=` query parameter and providing a JSON API for the frontend.
 
 ### Frontend

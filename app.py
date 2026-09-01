@@ -2,6 +2,7 @@ from flask import Flask, jsonify, render_template, request
 import yfinance as yf
 from flask_cors import CORS
 from fear_and_greed.cnn import get as get_fear_and_greed
+from datetime import datetime
 import os
 
 app = Flask(__name__, 
@@ -9,6 +10,48 @@ app = Flask(__name__,
             static_folder='.',
             static_url_path='')
 CORS(app)
+
+
+def _append_live_candle(ticker, hist):
+    """Ensure the last candle reflects the current trading day.
+
+    Yahoo's daily history can lag intraday (e.g. missing today's candle or
+    a stale cached close). If the newest candle is older than "today" in the
+    exchange's timezone, append/replace a live candle built from real-time
+    quote data.
+    """
+    try:
+        info = ticker.get_info()
+        price = info.get('regularMarketPrice')
+        market_time = info.get('regularMarketTime')
+        if price is None or not market_time:
+            return
+
+        tz = hist.index.tz
+        market_day = datetime.fromtimestamp(market_time, tz=tz).date()
+        last_day = hist.index[-1].date()
+
+        live = {
+            'Open': info.get('regularMarketOpen') or price,
+            'High': info.get('regularMarketDayHigh') or price,
+            'Low': info.get('regularMarketDayLow') or price,
+            'Close': price
+        }
+        if live['Low'] > live['Close']:
+            live['Low'] = live['Close']
+        if live['High'] < live['Close']:
+            live['High'] = live['Close']
+
+        if market_day == last_day:
+            # Replace the (possibly stale) candle of the current day.
+            for col, val in live.items():
+                hist.iloc[-1, hist.columns.get_loc(col)] = val
+        elif market_day > last_day:
+            import pandas as pd
+            hist.loc[pd.Timestamp(market_day, tz=tz)] = live
+    except Exception:
+        # Live data is best-effort; historical data is still served.
+        pass
 
 
 @app.route('/')
@@ -38,7 +81,9 @@ def get_stock_data(symbol):
         
         if hist.empty:
             return jsonify({'error': 'No data found for symbol'}), 404
-        
+
+        _append_live_candle(ticker, hist)
+
         candles = []
         for date, row in hist.iterrows():
             candles.append({
@@ -107,4 +152,5 @@ def get_fear_and_greed_index():
 
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    from waitress import serve
+    serve(app, host='127.0.0.1', port=5000)
