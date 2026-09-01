@@ -96,6 +96,13 @@ The script (Linux/macOS):
 
 The app runs with **waitress**, a production-ready WSGI server, instead of the Flask development server. This means no development-mode warnings and more stable handling of concurrent requests. Code changes require a server restart (no auto-reload).
 
+## Security
+
+- **Local Binding**: The server listens on `127.0.0.1` only and is intended for local, single-user use.
+- **CORS**: Restricted to the app's own origin (`http://127.0.0.1:5000` / `http://localhost:5000`) — external websites cannot call the local API.
+- **XSS Protection**: All third-party data (Yahoo Finance company info, search results) is rendered safely via DOM APIs (`textContent`) instead of `innerHTML`; website links are restricted to `http(s):` URLs and use `rel="noopener noreferrer"`.
+- **No Secrets / No State**: The app stores no credentials, sessions, or user data.
+
 ## Usage
 
 - **Loading Data**: Enter a ticker symbol (e.g., `SPY`, `BTC-USD`) in the input field and click **Load Chart**.

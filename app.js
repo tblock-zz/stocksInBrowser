@@ -195,11 +195,21 @@ document.addEventListener('DOMContentLoaded', function() {
             companyName.textContent = `--- ${info.longName || symbol} (${symbol}) ---`;
             
             companyDetails.innerHTML = '';
-            
+
+            const safeUrl = (url) => {
+                try {
+                    const parsed = new URL(url, window.location.origin);
+                    return (parsed.protocol === 'http:' || parsed.protocol === 'https:') ? parsed.href : null;
+                } catch {
+                    return null;
+                }
+            };
+            const websiteUrl = safeUrl(info.website);
+
             const infoMap = {
                 "Sector": info.sector,
                 "Industry": info.industry,
-                "Website": info.website ? `<a href="${info.website}" target="_blank">${info.website}</a>` : null,
+                "Website": websiteUrl,
                 "Currency": info.currency,
                 "Market Cap": formatNumber(info.marketCap),
                 "Shares Outstanding": formatNumber(info.sharesOutstanding),
@@ -229,13 +239,25 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (value !== null && value !== undefined && value !== 'N/A') {
                     const detailDiv = document.createElement('div');
                     detailDiv.className = 'info-item';
-                    
+
+                    const labelEl = document.createElement('strong');
+                    labelEl.textContent = `${label}:`;
+                    detailDiv.appendChild(labelEl);
+
                     if (label === 'Website') {
-                        detailDiv.innerHTML = `<strong>${label}:</strong> ${value}`;
+                        detailDiv.appendChild(document.createTextNode(' '));
+                        const link = document.createElement('a');
+                        link.href = value;
+                        link.textContent = value;
+                        link.target = '_blank';
+                        link.rel = 'noopener noreferrer';
+                        detailDiv.appendChild(link);
                     } else {
-                        detailDiv.innerHTML = `<strong>${label}:</strong> <span>${value}</span>`;
+                        const valueEl = document.createElement('span');
+                        valueEl.textContent = ` ${value}`;
+                        detailDiv.appendChild(valueEl);
                     }
-                    
+
                     companyDetails.appendChild(detailDiv);
                 }
             }

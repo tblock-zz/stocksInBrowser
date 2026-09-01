@@ -9,7 +9,7 @@ app = Flask(__name__,
             template_folder=os.path.dirname(os.path.abspath(__file__)),
             static_folder='.',
             static_url_path='')
-CORS(app)
+CORS(app, origins=['http://127.0.0.1:5000', 'http://localhost:5000'])
 
 
 def _append_live_candle(ticker, hist):
